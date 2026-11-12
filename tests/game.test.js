@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createGame,applyCommand,DEFAULT_CONFIG,normalizeConfig,connectedStates,towerDamage,sourceMode,attackPreview} from '../game.js';
+import {createGame,applyCommand,DEFAULT_CONFIG,normalizeConfig,connectedStates,towerDamage,sourceMode,attackPreview,TROOP_PACKAGES,upgradeCost,buildingLevel} from '../game.js';
 const cmd=(s,a,c)=>applyCommand(s,a,{...c,revision:s.revision});
 function fixture(config={}){const s=createGame(100,{removeCells:false,...config});s.turn=0;s.states.forEach(t=>{t.owner=-1;t.troops=8;t.building=null;t.gold=5;});s.states[0].owner=0;s.states[1].owner=0;s.states[6].owner=0;s.states[7].owner=0;s.states[35].owner=1;return s;}
 test('default opening is card-free, with one owned state each and random first player',()=>{const openings=new Set();for(let seed=0;seed<30;seed++){const s=createGame(seed);openings.add(s.turn);assert.equal(s.actions,2);assert.equal(s.players[0].hand,undefined);for(let a=0;a<2;a++)assert.equal(s.states.filter(t=>t.owner===a).length,1);}assert.equal(openings.size,2);});
@@ -21,3 +21,28 @@ test('all commands share action budget and ending early is allowed',()=>{let s=f
 test('growth and income happen once per complete round using host values',()=>{let s=fixture({growthPercent:10,goldPerRound:7,mineIncome:9,barracksBonus:5});s.states[0].troops=100;s.states[0].building='barracks';s.states[1].building='mine';s.states[2].troops=100;const before=structuredClone(s);s=cmd(s,0,{type:'end'});assert.deepEqual(s.states,before.states);assert.equal(s.players[0].gold,50);s=cmd(s,1,{type:'end'});assert.equal(s.states[0].troops,115);assert.equal(s.states[2].troops,110);assert.equal(s.players[0].gold,66);assert.equal(s.players[1].gold,57);});
 test('zero growth produces no troops and neutral growth toggle is respected',()=>{let s=fixture({growthPercent:0});const troops=s.states.map(t=>t.troops);s=cmd(s,0,{type:'end'});s=cmd(s,1,{type:'end'});assert.deepEqual(s.states.map(t=>t.troops),troops);s=fixture({growthPercent:20,neutralGrowth:false});s=cmd(s,0,{type:'end'});s=cmd(s,1,{type:'end'});assert.equal(s.states[2].troops,8);assert.equal(s.states[0].troops,9);});
 test('old card commands are rejected and elimination ends the match',()=>{let s=fixture();assert.throws(()=>cmd(s,0,{type:'play',card:1}),/Unknown/);s.states[28].owner=0;s.states[28].troops=100;s=cmd(s,0,{type:'attack',target:35,sources:[28]});assert.equal(s.winner,0);assert.throws(()=>cmd(s,0,{type:'end'}),/ended/);});
+
+test('all board sizes support zero removal and stable coordinates',()=>{
+ for(const size of [4,6,8,10]){const s=createGame(11,{boardSize:size,removedCells:0});assert.equal(s.states.length,size*size);assert.equal(s.states.filter(t=>t.active).length,size*size);assert.ok(connectedStates(s.states));assert.equal(s.states.at(-1).x,size-1);assert.equal(s.states.at(-1).y,size-1);}
+ assert.throws(()=>normalizeConfig({boardSize:5}));assert.throws(()=>normalizeConfig({boardSize:4,removedCells:15}));
+ const s=createGame(1,{boardSize:4,removedCells:14});assert.equal(s.states.filter(t=>t.active).length,2);assert.ok(connectedStates(s.states));
+});
+test('each troop package spends gold, adds exactly its troops and costs one action',()=>{
+ for(const [key,pack] of Object.entries(TROOP_PACKAGES)){let s=fixture({startingGold:100});const before=s.states[0].troops;s=cmd(s,0,{type:'buy',target:0,package:key});assert.equal(s.states[0].troops,before+pack.troops);assert.equal(s.players[0].gold,100-pack.cost);assert.equal(s.actions,1);}
+ let s=fixture({startingGold:0});assert.throws(()=>cmd(s,0,{type:'buy',target:0,package:'small'}),/gold/);assert.throws(()=>cmd(s,0,{type:'buy',target:35,package:'small'}),/owned/);assert.throws(()=>cmd(s,0,{type:'buy',target:0,package:'invalid'}),/package/);
+});
+test('upgrades charge scaling cost, enforce level cap and never repeat instant bonuses',()=>{
+ let s=fixture({startingGold:200,actionsPerTurn:5});s=cmd(s,0,{type:'build',target:0,building:'barracks'});const troops=s.states[0].troops;
+ assert.equal(upgradeCost(s.states[0],s.config),20);s=cmd(s,0,{type:'upgrade',target:0});assert.equal(buildingLevel(s.states[0]),2);assert.equal(s.players[0].gold,160);assert.equal(s.states[0].troops,troops);
+ assert.equal(upgradeCost(s.states[0],s.config),40);s=cmd(s,0,{type:'upgrade',target:0});assert.equal(buildingLevel(s.states[0]),3);assert.equal(s.players[0].gold,120);assert.throws(()=>cmd(s,0,{type:'upgrade',target:0}),/maximum/);
+ assert.throws(()=>cmd(s,0,{type:'upgrade',target:1}),/building/);assert.throws(()=>cmd(s,0,{type:'upgrade',target:35}),/owned/);
+});
+test('upgraded barracks, mines and towers apply distinct benefits',()=>{
+ let s=fixture({growthPercent:0,goldPerRound:0,startingGold:500,actionsPerTurn:5});s.states[0].building='barracks';s.states[0].level=2;s.states[0].troops=100;s.states[1].building='mine';s.states[1].level=3;s.states[6].building='tower';s.states[6].level=1;s.states[6].troops=100;
+ assert.equal(towerDamage(s.states[6],s.config),25);s=cmd(s,0,{type:'upgrade',target:6});assert.equal(towerDamage(s.states[6],s.config),37);s=cmd(s,0,{type:'upgrade',target:6});assert.equal(towerDamage(s.states[6],s.config),50);
+ const gold=s.players[0].gold;s=cmd(s,0,{type:'end'});s=cmd(s,1,{type:'end'});assert.equal(s.states[0].troops,116);assert.equal(s.players[0].gold,gold+24);
+});
+test('upgrades retain levels on conquest and insufficient gold cannot upgrade',()=>{
+ let s=fixture({startingGold:0});s.states[0].building='mine';s.states[0].level=1;assert.throws(()=>cmd(s,0,{type:'upgrade',target:0}),/gold/);
+ s.states[7].owner=-1;s.states[7].building='mine';s.states[7].level=3;s.states[0].troops=100;s=cmd(s,0,{type:'attack',target:7,sources:[0]});assert.equal(s.states[7].owner,0);assert.equal(s.states[7].level,3);
+});

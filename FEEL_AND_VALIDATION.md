@@ -13,3 +13,8 @@ Limits: no measured FPS/latency, no physical mobile or assistive-technology test
 Network verification passed in two browser tabs: host full grid, 0% growth, 4 actions/turn replicated to guest. Guest built a mine; host field report updated. Both turns ended; troops remained 12/12, treasury totals became 55/53, and guest action budget reset to 4. Reset all restored edited actions from 4 to 2. Per-field reset restored growth to 8. Cross-network devices remain untested.
 
 Diagnostic heuristic self-play: 30 seeded card-free matches, 60-round cutoff; 8 completed, mean 33.3 attacks and 129.1 transfers. This is not an optimal strategy or a controlled comparison with the old card bot.
+
+## Board sizes and economy revision
+Board picker supports 4/6/8/10, default 6. Removal supports 0 and dynamically validates size²−2 maximum. Renderer and network summaries use host board size; wide boards scroll together with coordinate labels. Buy and Upgrade join the permanent action palette. Three troop packages have explicit prices; upgrades preview next cost and effect. Tile level labels supplement enlarged building icons.
+
+23 rules tests and production build passed. New tests cover every size, zero removal, minimal connected boards, package amounts/costs/ownership, scaling upgrade costs and cap, no repeated construction bonuses, upgraded round production and tower damage, and levels retained on conquest. Browser used 8×8 / 64 states with 0 removal, 5 actions and 200 starting gold. Bought Company (+15, 25 gold), built a tower (25 gold), upgraded L1 → L2 (25 gold); treasury 200 → 125, troops 12 → 27, tower damage 6 → 10, 2/5 actions remained.
