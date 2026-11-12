@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createGame,applyCommand,DEFAULT_CONFIG,normalizeConfig,connectedStates,towerDamage,sourceMode,attackPreview,TROOP_PACKAGES,upgradeCost,buildingLevel} from '../game.js';
+import {createGame,applyCommand,DEFAULT_CONFIG,normalizeConfig,connectedStates,towerDamage,sourceMode,attackPreview,TROOP_PACKAGES,upgradeCost,buildingLevel,livingPlayers} from '../game.js';
 const cmd=(s,a,c)=>applyCommand(s,a,{...c,revision:s.revision});
 function fixture(config={}){const s=createGame(100,{removeCells:false,...config});s.turn=0;s.states.forEach(t=>{t.owner=-1;t.troops=8;t.building=null;t.gold=5;});s.states[0].owner=0;s.states[1].owner=0;s.states[6].owner=0;s.states[7].owner=0;s.states[35].owner=1;return s;}
 test('default opening is card-free, with one owned state each and random first player',()=>{const openings=new Set();for(let seed=0;seed<30;seed++){const s=createGame(seed);openings.add(s.turn);assert.equal(s.actions,2);assert.equal(s.players[0].hand,undefined);for(let a=0;a<2;a++)assert.equal(s.states.filter(t=>t.owner===a).length,1);}assert.equal(openings.size,2);});
@@ -45,4 +45,23 @@ test('upgraded barracks, mines and towers apply distinct benefits',()=>{
 test('upgrades retain levels on conquest and insufficient gold cannot upgrade',()=>{
  let s=fixture({startingGold:0});s.states[0].building='mine';s.states[0].level=1;assert.throws(()=>cmd(s,0,{type:'upgrade',target:0}),/gold/);
  s.states[7].owner=-1;s.states[7].building='mine';s.states[7].level=3;s.states[0].troops=100;s=cmd(s,0,{type:'attack',target:7,sources:[0]});assert.equal(s.states[7].owner,0);assert.equal(s.states[7].level,3);
+});
+
+test('three and four player maps assign unique spaced starts and validate capacity',()=>{
+ for(const playerCount of [3,4])for(const boardSize of [4,6,10]){const s=createGame(19,{playerCount,boardSize,removedCells:0});assert.equal(s.players.length,playerCount);assert.equal(livingPlayers(s).length,playerCount);for(let i=0;i<playerCount;i++)assert.equal(s.states.filter(t=>t.owner===i).length,1);assert.ok(s.turn>=0&&s.turn<playerCount);}
+ assert.throws(()=>normalizeConfig({playerCount:4,boardSize:4,removedCells:13}));
+ const s=createGame(2,{playerCount:4,boardSize:4,removedCells:12});assert.equal(livingPlayers(s).length,4);assert.ok(connectedStates(s.states));
+});
+test('four-player rounds wait for all players and rotate from random opener',()=>{
+ let s=createGame(120,{playerCount:4}),first=s.turn;const original=s.states.map(t=>t.troops);
+ for(let turn=0;turn<3;turn++){assert.equal(s.turn,(first+turn)%4);s=cmd(s,s.turn,{type:'end'});assert.equal(s.round,1);assert.deepEqual(s.states.map(t=>t.troops),original);}
+ s=cmd(s,s.turn,{type:'end'});assert.equal(s.round,2);assert.equal(s.turn,first);assert.equal(s.endedThisRound.length,0);assert.ok(s.states.some((t,i)=>t.troops>original[i]));
+});
+test('elimination skips defeated players without prematurely declaring victory',()=>{
+ let s=createGame(1,{playerCount:4,removeCells:false});s.turn=0;s.states.forEach(t=>{t.owner=-1;t.troops=1;});s.states[0].owner=0;s.states[0].troops=100;s.states[1].owner=1;s.states[30].owner=2;s.states[35].owner=3;
+ s=cmd(s,0,{type:'attack',target:1,sources:[0]});assert.equal(s.winner,null);assert.deepEqual(livingPlayers(s),[0,2,3]);s=cmd(s,0,{type:'end'});assert.equal(s.turn,2);s=cmd(s,2,{type:'end'});assert.equal(s.round,1);s=cmd(s,3,{type:'end'});assert.equal(s.round,2);assert.equal(s.turn,0);assert.equal(s.players[1].gold,50);assert.equal(s.players[2].gold,55);
+});
+test('last surviving player wins a multiplayer match',()=>{
+ let s=createGame(1,{playerCount:3,removeCells:false});s.turn=0;s.states.forEach(t=>{t.owner=-1;t.troops=1;});s.states[0].owner=0;s.states[0].troops=100;s.states[1].owner=1;s.states[6].owner=2;
+ s=cmd(s,0,{type:'attack',target:1,sources:[0]});assert.equal(s.winner,null);s=cmd(s,0,{type:'attack',target:6,sources:[0]});assert.equal(s.winner,0);
 });
