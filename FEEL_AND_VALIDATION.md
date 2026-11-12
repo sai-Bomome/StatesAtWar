@@ -53,3 +53,5 @@ Layering correction: territory artwork, coast and routes render before a dedicat
 
 
 Match frame update: all match HUD, resources, settings, reports and turn/win overlays are contained in the battlefield frame. Attack confirmation floats in map water with a target leader; it no longer uses a footer bar. Browser check on the default board confirmed the bubble stays inside the map with zero territory bounding-box overlaps. Build and all 41 tests passed.
+
+Combat regrouping: troop attacks always commit 100%. Successful conquest redistributes actual survivors evenly over marching sources plus the captured target, target-first remainder, deterministic source order. Towers retain garrisons. Preview exposes the same distribution the command applies; confirmed feedback includes return routes and final garrison counts. Tests cover troop conservation, rounding, scarce survivors, failure/ties, selection order and combined tower attacks. Build and all 44 tests passed.
