@@ -2,17 +2,18 @@ export const W=6,H=6;
 export const PLAYER_NAMES=['Azure','Ember','Jade','Violet'];
 export const CONFIG_FIELDS=[
  {key:'playerCount',label:'Players',type:'select',options:[2,3,4],default:2,min:2,max:4,group:'core'},
- {key:'boardSize',label:'Board size',type:'select',options:[4,6,8,10],default:6,min:4,max:10,group:'core'},
- {key:'removeCells',label:'Random cell removal',type:'boolean',default:true,hint:'Off keeps the complete grid.'},
- {key:'removedCells',label:'Cells to remove',default:10,min:0,max:98,group:'core'},
- {key:'growthPercent',label:'Troop growth per round (%)',default:8,min:0,max:50,group:'core'},
- {key:'actionsPerTurn',label:'Actions per turn',default:2,min:1,max:10,group:'core'},
- {key:'startingTroops',label:'Starting troops',default:12,min:2,max:500},
+ {key:'boardSize',label:'Board size',type:'select',options:[4,6,8,10],default:4,min:4,max:10,group:'core'},
+ {key:'removeCells',label:'Random cell removal',type:'boolean',default:false,hint:'Off keeps the complete grid.'},
+ {key:'removedCells',label:'Cells to remove',default:0,min:0,max:98,group:'core'},
+ {key:'growthPercent',label:'Troop growth per round (%)',default:5,min:0,max:50,group:'core'},
+ {key:'actionsPerTurn',label:'Actions per turn',default:3,min:1,max:10,group:'core'},
+ {key:'roundLimit',label:'Round limit (0 = unlimited)',default:8,min:0,max:100,group:'core',hint:'At the limit: most states wins; troops, then gold break ties.'},
+ {key:'startingTroops',label:'Starting troops',default:30,min:2,max:500},
  {key:'startingGold',label:'Starting gold',default:50,min:0,max:1000},
- {key:'neutralTroops',label:'Troops per neutral state',default:8,min:0,max:500},
+ {key:'neutralTroops',label:'Troops per neutral state',default:3,min:0,max:500},
  {key:'neutralGold',label:'Gold per neutral state',default:5,min:0,max:100},
- {key:'goldPerRound',label:'Treasury income per round',default:5,min:0,max:100,hint:'Paid to each player, in addition to mines.'},
- {key:'neutralGrowth',label:'Neutral states grow troops',type:'boolean',default:true},
+ {key:'goldPerRound',label:'Treasury income per round',default:10,min:0,max:100,hint:'Paid to each player, in addition to mines.'},
+ {key:'neutralGrowth',label:'Neutral states grow troops',type:'boolean',default:false},
  {key:'diagonalAttacks',label:'Allow diagonal attacks',type:'boolean',default:true},
  {key:'attackPercent',label:'Troops committed per attack (%)',default:50,min:1,max:100},
  {key:'barracksCost',label:'Barracks cost',default:20,min:0,max:500},
@@ -53,8 +54,9 @@ function fail(message){throw new Error(message);}
 function owned(s,id,actor){if(!Number.isInteger(id))fail('Choose an owned state.');const t=s.states[id];if(!t?.active||t.owner!==actor)fail('Choose an owned state.');return t;}
 export function attackPreview(s,targetId,sourceIds){const target=s.states[targetId];if(!target?.active)fail('Choose a target state.');let shot=0,troops=0;for(const id of sourceIds){const t=s.states[id],mode=sourceMode(t,target,s.config);if(mode==='tower')shot+=towerDamage(t,s.config);else if(mode==='troops')troops+=troopCommitment(t,s.config);}const defenders=Math.max(0,target.troops-shot);return {shot,troops,defenders,capture:troops>defenders,survivors:Math.max(0,troops-defenders),remaining:Math.max(0,defenders-troops)};}
 export const livingPlayers=s=>s.players.map((_,i)=>i).filter(i=>s.states.some(t=>t.active&&t.owner===i));
+export function standings(s){return s.players.map((p,id)=>{const owned=s.states.filter(t=>t.active&&t.owner===id);return {id,name:p.name,states:owned.length,troops:owned.reduce((n,t)=>n+t.troops,0),gold:p.gold};}).sort((a,b)=>b.states-a.states||b.troops-a.troops||b.gold-a.gold);}
 export function applyCommand(input,actor,cmd){const s=structuredClone(input),c=s.config;if(s.winner!==null)fail('The match has ended.');if(actor!==s.turn)fail('Wait for your turn.');if(cmd.revision!==s.revision)fail('The board changed. Try again.');const p=s.players[actor],log=m=>s.log.unshift(m);
- if(cmd.type==='end'){s.endedThisRound.push(actor);const living=livingPlayers(s);s.turnsInRound=s.endedThisRound.filter(i=>living.includes(i)).length;if(living.every(i=>s.endedThisRound.includes(i))){s.round++;s.turnsInRound=0;s.endedThisRound=[];for(const t of s.states){if(!t.active||(t.owner<0&&!c.neutralGrowth))continue;const rate=c.growthPercent+(t.building==='barracks'?c.barracksBonus*buildingLevel(t):0);if(rate>0)t.troops+=Math.max(1,Math.floor(t.troops*rate/100));if(t.building==='mine'&&t.owner>=0)s.players[t.owner].gold+=c.mineIncome*buildingLevel(t);}for(const id of living)s.players[id].gold+=c.goldPerRound;log(`Round ${s.round}: ${c.growthPercent}% troop growth; +${c.goldPerRound} treasury income per player; mines paid out.`);}do{s.turn=(s.turn+1)%s.players.length;}while(!living.includes(s.turn));s.actions=c.actionsPerTurn;log(`${s.players[s.turn].name}'s turn.`);}
+ if(cmd.type==='end'){s.endedThisRound.push(actor);const living=livingPlayers(s);s.turnsInRound=s.endedThisRound.filter(i=>living.includes(i)).length;if(living.every(i=>s.endedThisRound.includes(i))){if(c.roundLimit>0&&s.round>=c.roundLimit){const ranks=standings(s),top=ranks[0],tied=ranks.filter(r=>r.states===top.states&&r.troops===top.troops&&r.gold===top.gold);s.winner=tied.length>1?-1:top.id;s.resultReason='round-limit';s.actions=0;log(`Round ${s.round} limit reached. ${s.winner===-1?'Draw: territory, troops and gold are tied.':top.name+' wins on territory, then troops and gold.'}`);s.revision++;s.log=s.log.slice(0,35);return s;}s.round++;s.turnsInRound=0;s.endedThisRound=[];for(const t of s.states){if(!t.active||(t.owner<0&&!c.neutralGrowth))continue;const rate=c.growthPercent+(t.building==='barracks'?c.barracksBonus*buildingLevel(t):0);if(rate>0)t.troops+=Math.max(1,Math.floor(t.troops*rate/100));if(t.building==='mine'&&t.owner>=0)s.players[t.owner].gold+=c.mineIncome*buildingLevel(t);}for(const id of living)s.players[id].gold+=c.goldPerRound;log(`Round ${s.round}: ${c.growthPercent}% troop growth; +${c.goldPerRound} treasury income per player; mines paid out.`);}do{s.turn=(s.turn+1)%s.players.length;}while(!living.includes(s.turn));s.actions=c.actionsPerTurn;log(`${s.players[s.turn].name}'s turn.`);}
  else {if(s.actions<=0)fail('No actions left. End your turn.');
   if(cmd.type==='build'){const t=owned(s,cmd.target,actor),b=BUILDINGS[cmd.building];if(!b||!Object.hasOwn(BUILDINGS,cmd.building))fail('Choose a building.');if(t.building)fail('This state already has a building.');const cost=c[b.costKey];if(p.gold<cost)fail(`Need ${cost} gold.`);p.gold-=cost;t.building=cmd.building;t.level=1;if(cmd.building==='barracks')t.troops+=Math.ceil(t.troops*c.barracksInstant/100);if(cmd.building==='mine')p.gold+=c.mineInstant;log(`${p.name} built ${b.name} at ${label(t)}.`);}
   else if(cmd.type==='buy'){const t=owned(s,cmd.target,actor),pack=Object.hasOwn(TROOP_PACKAGES,cmd.package)?TROOP_PACKAGES[cmd.package]:null;if(!pack)fail('Choose a troop package.');if(p.gold<pack.cost)fail(`Need ${pack.cost} gold.`);p.gold-=pack.cost;t.troops+=pack.troops;log(`${p.name} bought ${pack.troops} troops at ${label(t)} for ${pack.cost} gold.`);}
