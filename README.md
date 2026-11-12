@@ -20,7 +20,7 @@ Push this folder's contents to a GitHub repository with a `main` branch. In repo
 - Select a card, select its target, then confirm. Gold cards need no state target.
 - Attack: select an enemy/neutral target first, then up to the card's limit of owned source states. The order desk previews the result before commitment. Click a source again to deselect. Escape cancels targeting.
 - Troops can attack edge-sharing or diagonal neighbours, contributing floor(50%) of their troops. That force leaves the source. Combat is deterministic 1:1; survivors occupy. Ties leave the original owner with zero defenders.
-- Towers fire within Manhattan range 3, instead of sending troops. Damage starts at 5, grows +1 each round, capped at 10. Tower damage resolves before troop combat. Towers alone cannot conquer or collect gold.
+- Towers fire within Manhattan range 3, instead of sending troops. Damage equals 25% of the current garrison, rounded down, minimum 1 with troops; empty towers deal 0 and cannot fire. There is no separate round damage growth or garrison-based damage. Firing consumes no troops; reinforcements, losses and round troop growth immediately change damage. Tower damage resolves before troop combat. Towers alone cannot conquer or collect gold.
 - 3 starting cards, draw 1 at turn start, up to 2 card actions, max 5 in hand. Discard excess free. Empty hands refill immediately with 3 without resetting actions. The randomly chosen opening player also draws 1 on their first turn.
 - Once per turn, select a card and use **Replace card · 1 action** to discard it and draw one replacement. This uses one of the two actions, does not reset the action budget, and cannot bypass hand overflow.
 - End a turn early at any time after resolving hand overflow. After both turns: all playable states, including neutral states, grow troops by 8% (floor, minimum +1). Round order remains fixed.
@@ -40,5 +40,5 @@ Dark field-map presentation with Azure/Ember labels, troop counts and state coor
     npm test
     npm run build
 
-Rules tests cover opening deal, turns/rounds, stale/wrong-player commands, hand overflow/refill, attack range and source limits, troop conquest, combined/tower-only attacks, building costs, damage cap and private-hand redaction. Browser checks cover local handoff, tower construction and tower bombardment. Two-tab online checks verified room joining, turn authority, synchronized resource-card play, and round advancement. Cross-network connection quality and mobile-device performance require playtesting.
+Rules tests cover opening deal, turns/rounds, stale/wrong-player commands, hand overflow/refill, attack range and source limits, troop conquest, combined/tower-only attacks, building costs, garrison-based damage and private-hand redaction. Browser checks cover local handoff, tower construction and tower bombardment. Two-tab online checks verified room joining, turn authority, synchronized resource-card play, and round advancement. Cross-network connection quality and mobile-device performance require playtesting.
 
