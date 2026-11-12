@@ -1,4 +1,4 @@
-import {createGame,applyCommand,CARD_TYPES,sourceMode,adjacent} from '../game.js';
+import {createGame,applyCommand,CARD_TYPES,sourceMode,attackAdjacent as adjacent} from '../game.js';
 export function options(s){const a=s.turn,p=s.players[a],own=s.states.filter(t=>t.active&&t.owner===a),other=s.states.filter(t=>t.active&&t.owner!==a),front=own.filter(t=>other.some(n=>adjacent(t,n)));const out=[];
 for(const c of p.hand){const d=CARD_TYPES[c.type];if(d.kind==='gold')out.push({score:p.gold<25?12:1,command:{type:'play',card:c.id}});
 if(d.kind==='troops')for(const t of front)out.push({score:20+d.amount/10,command:{type:'play',card:c.id,target:t.id}});

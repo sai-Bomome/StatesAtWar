@@ -89,3 +89,23 @@ test('redraw cannot bypass exhausted actions or excess hand limit',()=>{
   s.actions=2;while(s.players[actor].hand.length<6)s.players[actor].hand.push({id:++s.cardId,type:'gold'});
   assert.throws(()=>cmd(s,actor,{type:'redraw',card:s.players[actor].hand[0].id}),/Discard/);
 });
+
+test('single-state attacks conquer across all four diagonals with half the source troops',()=>{
+  for(const target of [0,2,12,14]){
+    let s=battle();s.states[7].owner=0;s.states[7].troops=20;s.states[target].owner=-1;s.states[target].troops=6;
+    s.players[0].hand=[{id:999,type:'attack1'}];
+    s=cmd(s,0,{type:'play',card:999,target,sources:[7]});
+    assert.equal(s.states[7].troops,10);assert.equal(s.states[target].owner,0);assert.equal(s.states[target].troops,4);
+  }
+});
+test('diagonal attacks do not extend troop range beyond one tile',()=>{
+  let s=battle();s.states[7].owner=0;s.states[7].troops=20;
+  assert.throws(()=>cmd(s,0,{type:'play',card:999,target:21,sources:[7]}),/neighbours/);
+});
+test('Attack 1 occurs more often than other attacks while preserving attack category odds',()=>{
+  const rng={seed:90210},counts={attack1:0,attack2:0,attack3:0};
+  for(let i=0;i<100000;i++){const type=drawCardType(rng);if(type in counts)counts[type]++;}
+  assert.ok(Math.abs(counts.attack1/100000-.18)<.01);
+  assert.ok(Math.abs(counts.attack2/100000-.05)<.01);
+  assert.ok(Math.abs(counts.attack3/100000-.02)<.01);
+});

@@ -19,12 +19,12 @@ Push this folder's contents to a GitHub repository with a `main` branch. In repo
 
 - Select a card, select its target, then confirm. Gold cards need no state target.
 - Attack: select an enemy/neutral target first, then up to the card's limit of owned source states. The order desk previews the result before commitment. Click a source again to deselect. Escape cancels targeting.
-- Troops can attack only orthogonal neighbours, contributing floor(50%) of their troops. That force leaves the source. Combat is deterministic 1:1; survivors occupy. Ties leave the original owner with zero defenders.
+- Troops can attack edge-sharing or diagonal neighbours, contributing floor(50%) of their troops. That force leaves the source. Combat is deterministic 1:1; survivors occupy. Ties leave the original owner with zero defenders.
 - Towers fire within Manhattan range 3, instead of sending troops. Damage starts at 5, grows +1 each round, capped at 10. Tower damage resolves before troop combat. Towers alone cannot conquer or collect gold.
 - 3 starting cards, draw 1 at turn start, up to 2 card actions, max 5 in hand. Discard excess free. Empty hands refill immediately with 3 without resetting actions. The randomly chosen opening player also draws 1 on their first turn.
 - Once per turn, select a card and use **Replace card · 1 action** to discard it and draw one replacement. This uses one of the two actions, does not reset the action budget, and cannot bypass hand overflow.
 - End a turn early at any time after resolving hand overflow. After both turns: all playable states, including neutral states, grow troops by 8% (floor, minimum +1). Round order remains fixed.
-- Resource cards: +5/+10/+15/+20 troops at one owned state; +10/+20/+30/+50 global gold. Draws use weights: 60% resource, 25% attack, 15% build. The resource share is 40% troop cards and 20% gold cards (previously 30% each). Smaller resource values are more common. There are 14 distinct cards, including 8 resource variants. Tune probabilities in DRAW_WEIGHTS in game.js.
+- Resource cards: +5/+10/+15/+20 troops at one owned state; +10/+20/+30/+50 global gold. Draws use weights: 60% resource, 25% attack, 15% build. Attack 1 is 18% of all draws, Attack 2 is 5%, Attack 3 is 2%. The resource share is 40% troop cards and 20% gold cards (previously 30% each). Smaller resource values are more common. There are 14 distinct cards, including 8 resource variants. Tune probabilities in DRAW_WEIGHTS in game.js.
 - One building per state. Barracks: cost 20 gold, instant +25% troops (ceil), +8 percentage points growth. Tower: cost 25 gold. Mine: cost 20 gold, instant +10 gold and +8 gold per round. Buildings survive conquest.
 - Gold lives in the shared treasury. Neutral states additionally hold 5 unclaimed gold each, collected once on conquest. Enemy treasury gold is never looted.
 - Eliminate all opponent-owned states to win.
