@@ -1,60 +1,55 @@
 export const W=6,H=6;
-export const REMOVED_CELLS=10;
-export const RULES={growth:.08,barracksBonus:.08,towerTroopRatio:.25,mineIncome:8,handLimit:5,refill:3,actions:2};
-export const CARD_TYPES={troops15:{name:'Reserves',value:'+15',icon:'✚',kind:'troops',amount:15,description:'Add 15 troops to one owned state.'},troops20:{name:'Mass mobilization',value:'+20',icon:'✚',kind:'troops',amount:20,description:'Add 20 troops to one owned state.'},gold10:{name:'Supply funds',value:'+10',icon:'◈',kind:'gold',amount:10,description:'Add 10 gold to your treasury.'},gold20:{name:'Treasury grant',value:'+20',icon:'◈',kind:'gold',amount:20,description:'Add 20 gold to your treasury.'},gold50:{name:'Windfall',value:'+50',icon:'◈',kind:'gold',amount:50,description:'Add 50 gold to your treasury.'},troops5:{name:'Reinforcements',value:'+5',icon:'✚',kind:'troops',amount:5,description:'Add 5 troops to one owned state.'},troops10:{name:'Mobilization',value:'+10',icon:'✚',kind:'troops',amount:10,description:'Add 10 troops to one owned state.'},gold:{name:'War chest',value:'+30',icon:'◈',kind:'gold',amount:30,description:'Add 30 gold to your treasury.'},attack1:{name:'Skirmish',value:'1 state',icon:'⚔',kind:'attack',max:1,description:'Attack one target with up to 1 state.'},attack2:{name:'Offensive',value:'2 states',icon:'⚔',kind:'attack',max:2,description:'Attack one target with up to 2 states.'},attack3:{name:'Combined arms',value:'3 states',icon:'⚔',kind:'attack',max:3,description:'Attack one target with up to 3 states.'},barracks:{name:'Barracks',value:'20 gold',icon:'▥',kind:'build',cost:20,description:'+25% troops now. +8 percentage points of growth each round.'},tower:{name:'Attack tower',value:'25 gold',icon:'♜',kind:'build',cost:25,description:'Range 3. Damage = 25% of garrison troops (rounded down, minimum 1 if occupied). Firing keeps troops in place.'},mine:{name:'Gold mine',value:'20 gold',icon:'◈',kind:'build',cost:20,description:'+10 gold immediately. Produces 8 gold per round.'}};
-// Relative draw weights sum to 100: resources 60%, attacks 25%, buildings 15%.
-export const DRAW_WEIGHTS={troops5:17,troops10:13,troops15:6,troops20:4,gold10:7,gold20:5,gold:5,gold50:3,attack1:18,attack2:5,attack3:2,barracks:5,tower:5,mine:5};
-const weightedCards=Object.entries(DRAW_WEIGHTS);
-const totalWeight=weightedCards.reduce((sum,[,weight])=>sum+weight,0);
-export function drawCardType(s){let roll=random(s)*totalWeight;for(const [type,weight] of weightedCards){roll-=weight;if(roll<0)return type;}return weightedCards.at(-1)[0];}
+export const CONFIG_FIELDS=[
+ {key:'removeCells',label:'Random cell removal',type:'boolean',default:true,hint:'Off keeps the complete 6 × 6 grid.'},
+ {key:'removedCells',label:'Cells to remove',default:10,min:1,max:20,group:'core'},
+ {key:'growthPercent',label:'Troop growth per round (%)',default:8,min:0,max:50,group:'core'},
+ {key:'actionsPerTurn',label:'Actions per turn',default:2,min:1,max:10,group:'core'},
+ {key:'startingTroops',label:'Starting troops',default:12,min:2,max:500},
+ {key:'startingGold',label:'Starting gold',default:50,min:0,max:1000},
+ {key:'neutralTroops',label:'Troops per neutral state',default:8,min:0,max:500},
+ {key:'neutralGold',label:'Gold per neutral state',default:5,min:0,max:100},
+ {key:'goldPerRound',label:'Treasury income per round',default:5,min:0,max:100,hint:'Paid to each player, in addition to mines.'},
+ {key:'neutralGrowth',label:'Neutral states grow troops',type:'boolean',default:true},
+ {key:'diagonalAttacks',label:'Allow diagonal attacks',type:'boolean',default:true},
+ {key:'attackPercent',label:'Troops committed per attack (%)',default:50,min:1,max:100},
+ {key:'barracksCost',label:'Barracks cost',default:20,min:0,max:500},
+ {key:'towerCost',label:'Tower cost',default:25,min:0,max:500},
+ {key:'mineCost',label:'Gold mine cost',default:20,min:0,max:500},
+ {key:'barracksInstant',label:'Barracks instant troop bonus (%)',default:25,min:0,max:100},
+ {key:'barracksBonus',label:'Barracks extra round growth (%)',default:8,min:0,max:50},
+ {key:'mineInstant',label:'Mine instant gold bonus',default:10,min:0,max:100},
+ {key:'mineIncome',label:'Mine income per round',default:8,min:0,max:100},
+ {key:'towerRange',label:'Tower range (Manhattan tiles)',default:3,min:1,max:10},
+ {key:'towerPercent',label:'Tower damage / garrison (%)',default:25,min:1,max:100}
+];
+export const DEFAULT_CONFIG=Object.freeze(Object.fromEntries(CONFIG_FIELDS.map(f=>[f.key,f.default])));
+export const BUILDINGS={barracks:{name:'Barracks',icon:'castle',costKey:'barracksCost'},tower:{name:'Attack tower',icon:'lighthouse',costKey:'towerCost'},mine:{name:'Gold mine',icon:'windmill',costKey:'mineCost'}};
+export function normalizeConfig(input={}){const out={};for(const f of CONFIG_FIELDS){const v=input[f.key]??f.default;if(f.type==='boolean'){if(typeof v!=='boolean')throw new Error(`Invalid ${f.label}.`);}else if(!Number.isInteger(v)||v<f.min||v>f.max)throw new Error(`${f.label} must be ${f.min}–${f.max}.`);out[f.key]=v;}return out;}
 function random(s){s.seed=(Math.imul(s.seed,1664525)+1013904223)>>>0;return s.seed/4294967296;}
-function draw(s,p,n){for(let i=0;i<n;i++)s.players[p].hand.push({id:++s.cardId,type:drawCardType(s)});}
 export const adjacent=(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y)===1;
 export const attackAdjacent=(a,b)=>Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y))===1;
-export const towerDamage=t=>t.active&&t.building==='tower'&&t.troops>0?Math.max(1,Math.floor(t.troops*RULES.towerTroopRatio)):0;
-export function sourceMode(source,target){if(source.active===false||target.active===false)return null;if(towerDamage(source)>0&&Math.abs(source.x-target.x)+Math.abs(source.y-target.y)<=3)return 'tower';if(attackAdjacent(source,target)&&source.troops>=2)return 'troops';return null;}
-// Remove only non-articulation cells, preserving one orthogonally connected landmass.
-export function connectedStates(states){
-  const land=states.filter(t=>t.active), seen=new Set();
-  if(!land.length)return false;
-  const queue=[land[0]];seen.add(land[0].id);
-  for(const t of queue)for(const n of land)if(!seen.has(n.id)&&adjacent(t,n)){seen.add(n.id);queue.push(n);}
-  return seen.size===land.length;
-}
-function generateMap(s){
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++)s.states.push({id:y*W+x,x,y,active:true,owner:-1,troops:6+Math.floor(random(s)*7),gold:5,building:null});
-  let removed=0;
-  while(removed<REMOVED_CELLS){
-    const candidates=s.states.filter(t=>t.active);
-    // A shuffled scan always finds a removable cell in a connected finite graph.
-    for(let i=candidates.length-1;i>0;i--){const j=Math.floor(random(s)*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]];}
-    for(const t of candidates){t.active=false;if(connectedStates(s.states)){t.troops=0;t.gold=0;removed++;break;}t.active=true;}
-  }
-  const land=s.states.filter(t=>t.active);
-  let longest=-1,pairs=[];
-  // Place the two starting states at opposite ends of the actual walkable graph.
-  for(const a of land){
-    const distances=new Map([[a.id,0]]),queue=[a];
-    for(const t of queue)for(const n of land)if(!distances.has(n.id)&&adjacent(t,n)){distances.set(n.id,distances.get(t.id)+1);queue.push(n);}
-    for(const b of land){if(b.id<=a.id)continue;const d=distances.get(b.id);if(d>longest){longest=d;pairs=[[a,b]];}else if(d===longest)pairs.push([a,b]);}
-  }
-  const starts=pairs[Math.floor(random(s)*pairs.length)];
-  if(random(s)<.5)starts.reverse();
-  starts.forEach((t,owner)=>{t.owner=owner;t.troops=12;t.gold=0;});
-}
-export function createGame(seed=Date.now()>>>0){
-  const s={seed,cardId:0,revision:0,round:1,turn:0,first:0,turnsInRound:0,actions:2,redrawUsed:false,winner:null,players:[{name:'Azure',gold:50,hand:[]},{name:'Ember',gold:50,hand:[]}],states:[],log:[]};
-  generateMap(s);
-  s.first=s.turn=Math.floor(random(s)*2);draw(s,0,3);draw(s,1,3);draw(s,s.turn,1);
-  s.log=[`${s.players[s.turn].name} won the opening draw. Round 1 begins.`];return s;
-}
-function fail(message){throw new Error(message);}
-export function applyCommand(input,actor,c){const s=structuredClone(input);if(s.winner!==null)fail('The match has ended.');if(actor!==s.turn)fail('Wait for your turn.');if(c.revision!==s.revision)fail('The board changed. Try again.');const p=s.players[actor];const log=m=>s.log.unshift(m);const overflow=()=>p.hand.length>RULES.handLimit;
-if(c.type==='discard'){if(!overflow())fail('Only discard when above the hand limit.');const i=p.hand.findIndex(k=>k.id===c.card);if(i<0)fail('Card not found.');p.hand.splice(i,1);log(`${p.name} discarded a card.`);}
-else if(c.type==='redraw'){if(overflow())fail('Discard excess cards first.');if(s.actions<=0)fail('No actions left. End your turn.');if(s.redrawUsed)fail('You can redraw only once per turn.');const i=p.hand.findIndex(k=>k.id===c.card);if(i<0)fail('Card not found.');p.hand.splice(i,1);draw(s,actor,1);s.actions--;s.redrawUsed=true;log(`${p.name} replaced a card for 1 action.`);}
-else if(c.type==='end'){if(overflow())fail('Discard excess cards first.');s.turnsInRound++;if(s.turnsInRound===2){s.round++;s.turnsInRound=0;for(const t of s.states){if(!t.active)continue;t.troops+=Math.max(1,Math.floor(t.troops*(RULES.growth+(t.building==='barracks'?RULES.barracksBonus:0))));if(t.building==='mine'&&t.owner>=0)s.players[t.owner].gold+=RULES.mineIncome;}log(`Round ${s.round}: all states gained 8% troops (barracks: 16%); mines paid out. Tower damage follows garrison strength.`);}s.turn=1-s.turn;s.actions=RULES.actions;s.redrawUsed=false;draw(s,s.turn,1);log(`${s.players[s.turn].name}'s turn. Drew 1 card.`);}
-else if(c.type==='play'){if(overflow())fail('Discard excess cards first.');if(s.actions<=0)fail('No actions left. End your turn.');const i=p.hand.findIndex(k=>k.id===c.card);if(i<0)fail('Card not found.');const card=CARD_TYPES[p.hand[i].type],target=s.states[c.target];if(card.kind==='gold'){p.gold+=card.amount;log(`${p.name}: +${card.amount} gold.`);}else if(card.kind==='attack'){if(!target||!target.active||target.owner===actor)fail('Choose an enemy or neutral target.');if(!Array.isArray(c.sources)||!c.sources.length||c.sources.length>card.max||new Set(c.sources).size!==c.sources.length)fail(`Select 1–${card.max} attacking states.`);let damage=0,committed=0;for(const id of c.sources){const t=s.states[id];if(!t||!t.active||t.owner!==actor)fail('Choose your own attacking states.');const mode=sourceMode(t,target);if(!mode)fail('Troops must be edge or diagonal neighbours; towers have range 3.');if(mode==='tower')damage+=towerDamage(t);else{const n=Math.floor(t.troops/2);t.troops-=n;committed+=n;}}const remaining=Math.max(0,target.troops-damage);if(committed>remaining){target.owner=actor;target.troops=committed-remaining;p.gold+=target.gold;target.gold=0;log(`${p.name} conquered ${label(target)} with ${target.troops} survivors.`);}else{target.troops=Math.max(0,remaining-committed);log(`${p.name} struck ${label(target)}: ${damage+committed} damage, ${target.troops} defenders remain.`);}}
-else{if(!target||!target.active||target.owner!==actor)fail('Choose one of your states.');if(card.kind==='troops'){target.troops+=card.amount;log(`${p.name}: +${card.amount} troops at ${label(target)}.`);}else{if(target.building)fail('This state already has a building.');if(p.gold<card.cost)fail(`Need ${card.cost} gold.`);p.gold-=card.cost;target.building=p.hand[i].type;if(target.building==='barracks')target.troops+=Math.ceil(target.troops*.25);if(target.building==='mine')p.gold+=10;log(`${p.name} built ${card.name} at ${label(target)}.`);}}p.hand.splice(i,1);s.actions--;if(!p.hand.length){draw(s,actor,RULES.refill);log(`${p.name}'s empty hand refilled with 3 cards.`);}if(!s.states.some(t=>t.owner===1-actor)){s.winner=actor;log(`${p.name} wins the war!`);}}
-else fail('Unknown command.');s.revision++;s.log=s.log.slice(0,35);return s;}
 export const label=t=>`${String.fromCharCode(65+t.x)}${t.y+1}`;
-export function viewFor(s,actor){const v=structuredClone(s);v.players.forEach((p,i)=>{p.cardCount=p.hand.length;if(i!==actor)p.hand=[];});return v;}
+export const towerDamage=(t,c=DEFAULT_CONFIG)=>t?.active&&t.building==='tower'&&t.troops>0?Math.max(1,Math.floor(t.troops*c.towerPercent/100)):0;
+export const troopCommitment=(t,c=DEFAULT_CONFIG)=>Math.floor(t.troops*c.attackPercent/100);
+export function sourceMode(source,target,c=DEFAULT_CONFIG){if(!source?.active||!target?.active||source.id===target.id)return null;if(towerDamage(source,c)>0&&Math.abs(source.x-target.x)+Math.abs(source.y-target.y)<=c.towerRange)return 'tower';if((c.diagonalAttacks?attackAdjacent:adjacent)(source,target)&&troopCommitment(source,c)>0)return 'troops';return null;}
+export function connectedStates(states){const land=states.filter(t=>t.active);if(!land.length)return false;const seen=new Set([land[0].id]),queue=[land[0]];for(const t of queue)for(const n of land)if(!seen.has(n.id)&&adjacent(t,n)){seen.add(n.id);queue.push(n);}return seen.size===land.length;}
+function generateMap(s){const c=s.config;for(let y=0;y<H;y++)for(let x=0;x<W;x++)s.states.push({id:y*W+x,x,y,active:true,owner:-1,troops:c.neutralTroops,gold:c.neutralGold,building:null});
+ for(let removed=0;removed<(c.removeCells?c.removedCells:0);removed++){const candidates=s.states.filter(t=>t.active);for(let i=candidates.length-1;i>0;i--){const j=Math.floor(random(s)*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]];}for(const t of candidates){t.active=false;if(connectedStates(s.states)){t.troops=0;t.gold=0;break;}t.active=true;}}
+ const land=s.states.filter(t=>t.active);let longest=-1,pairs=[];for(const a of land){const distances=new Map([[a.id,0]]),queue=[a];for(const t of queue)for(const n of land)if(!distances.has(n.id)&&adjacent(t,n)){distances.set(n.id,distances.get(t.id)+1);queue.push(n);}for(const b of land){if(b.id<=a.id)continue;const d=distances.get(b.id);if(d>longest){longest=d;pairs=[[a,b]];}else if(d===longest)pairs.push([a,b]);}}
+ const starts=pairs[Math.floor(random(s)*pairs.length)];if(random(s)<.5)starts.reverse();starts.forEach((t,owner)=>{t.owner=owner;t.troops=c.startingTroops;t.gold=0;});
+}
+export function createGame(seed=Date.now()>>>0,config={}){const c=normalizeConfig(config),s={seed,revision:0,round:1,turn:0,first:0,turnsInRound:0,actions:c.actionsPerTurn,winner:null,config:c,players:[{name:'Azure',gold:c.startingGold},{name:'Ember',gold:c.startingGold}],states:[],log:[]};generateMap(s);s.first=s.turn=Math.floor(random(s)*2);s.log=[`${s.players[s.turn].name} won the opening draw. Round 1 begins.`];return s;}
+function fail(message){throw new Error(message);}
+function owned(s,id,actor){if(!Number.isInteger(id))fail('Choose an owned state.');const t=s.states[id];if(!t?.active||t.owner!==actor)fail('Choose an owned state.');return t;}
+export function attackPreview(s,targetId,sourceIds){const target=s.states[targetId];if(!target?.active)fail('Choose a target state.');let shot=0,troops=0;for(const id of sourceIds){const t=s.states[id],mode=sourceMode(t,target,s.config);if(mode==='tower')shot+=towerDamage(t,s.config);else if(mode==='troops')troops+=troopCommitment(t,s.config);}const defenders=Math.max(0,target.troops-shot);return {shot,troops,defenders,capture:troops>defenders,survivors:Math.max(0,troops-defenders),remaining:Math.max(0,defenders-troops)};}
+export function applyCommand(input,actor,cmd){const s=structuredClone(input),c=s.config;if(s.winner!==null)fail('The match has ended.');if(actor!==s.turn)fail('Wait for your turn.');if(cmd.revision!==s.revision)fail('The board changed. Try again.');const p=s.players[actor],log=m=>s.log.unshift(m);
+ if(cmd.type==='end'){s.turnsInRound++;if(s.turnsInRound===2){s.round++;s.turnsInRound=0;for(const t of s.states){if(!t.active||(t.owner<0&&!c.neutralGrowth))continue;const rate=c.growthPercent+(t.building==='barracks'?c.barracksBonus:0);if(rate>0)t.troops+=Math.max(1,Math.floor(t.troops*rate/100));if(t.building==='mine'&&t.owner>=0)s.players[t.owner].gold+=c.mineIncome;}for(const player of s.players)player.gold+=c.goldPerRound;log(`Round ${s.round}: ${c.growthPercent}% troop growth; +${c.goldPerRound} treasury income per player; mines paid out.`);}s.turn=1-s.turn;s.actions=c.actionsPerTurn;log(`${s.players[s.turn].name}'s turn.`);}
+ else {if(s.actions<=0)fail('No actions left. End your turn.');
+  if(cmd.type==='build'){const t=owned(s,cmd.target,actor),b=BUILDINGS[cmd.building];if(!b||!Object.hasOwn(BUILDINGS,cmd.building))fail('Choose a building.');if(t.building)fail('This state already has a building.');const cost=c[b.costKey];if(p.gold<cost)fail(`Need ${cost} gold.`);p.gold-=cost;t.building=cmd.building;if(cmd.building==='barracks')t.troops+=Math.ceil(t.troops*c.barracksInstant/100);if(cmd.building==='mine')p.gold+=c.mineInstant;log(`${p.name} built ${b.name} at ${label(t)}.`);}
+  else if(cmd.type==='move'){const from=owned(s,cmd.source,actor),to=owned(s,cmd.target,actor);if(from.id===to.id)fail('Choose a different destination.');if(!Number.isInteger(cmd.amount)||cmd.amount<1||cmd.amount>=from.troops)fail('Move at least 1 troop and leave at least 1 behind.');from.troops-=cmd.amount;to.troops+=cmd.amount;log(`${p.name} moved ${cmd.amount} troops from ${label(from)} to ${label(to)}.`);}
+  else if(cmd.type==='attack'){if(!Number.isInteger(cmd.target))fail('Choose an enemy or neutral target.');const target=s.states[cmd.target];if(!target?.active||target.owner===actor)fail('Choose an enemy or neutral target.');if(!Array.isArray(cmd.sources)||!cmd.sources.length||cmd.sources.length>s.states.length||new Set(cmd.sources).size!==cmd.sources.length)fail('Select one or more distinct attacking states.');for(const id of cmd.sources){const t=owned(s,id,actor);if(!sourceMode(t,target,c))fail('Source out of range: troops need a shared edge or corner (if enabled); towers use their configured range.');}
+   const outcome=attackPreview(s,cmd.target,cmd.sources);for(const id of cmd.sources){const t=s.states[id];if(sourceMode(t,target,c)==='troops')t.troops-=troopCommitment(t,c);}if(outcome.capture){target.owner=actor;target.troops=outcome.survivors;p.gold+=target.gold;target.gold=0;log(`${p.name} conquered ${label(target)} with ${target.troops} survivors.`);}else{target.troops=outcome.remaining;log(`${p.name} struck ${label(target)}: ${outcome.shot+outcome.troops} damage, ${target.troops} defenders remain.`);}if(!s.states.some(t=>t.active&&t.owner===1-actor)){s.winner=actor;log(`${p.name} wins the war!`);}}
+  else fail('Unknown action.');s.actions--;
+ }s.revision++;s.log=s.log.slice(0,35);return s;
+}
+export const viewFor=s=>structuredClone(s);
